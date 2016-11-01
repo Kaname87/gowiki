@@ -1,4 +1,12 @@
 <h1>Index</h1>
 {{range $index, $element := .}}
-<li><a href="/view/{{.Title}}">{{.Title}}</a></li>
+<li>{{.Title}} <a href="/view/{{.Title}}">edit</a> <a href="/delete/{{.Title}}">delete</a></li>
 {{end}}
+
+<h1>Create</h1>
+<form action="/create/" method="POST">
+<div>
+  <div>Title: <input name="title"></div>
+<div>
+<div><input type="submit" value="Save"></div>
+</form>

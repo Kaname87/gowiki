@@ -18,7 +18,7 @@ type Page struct {
 
 
 var templates = template.Must(template.ParseFiles("edit.html", "view.html", "index.html"))
-var validPath = regexp.MustCompile("^/(edit|save|view)/([a-zA-Z0-9]+)$")
+var validPath = regexp.MustCompile("^/(edit|save|view|index|delete)/([a-zA-Z0-9]+)$")
 
 func getTitle(w http.ResponseWriter, r *http.Request) (string, error) {
 	m := validPath.FindStringSubmatch(r.URL.Path)
@@ -84,6 +84,32 @@ func (p *Page) save() {
 	return;
 }
 
+func (p *Page) delete() {
+	db, err := sql.Open("mysql", "root:admin@/gowiki")
+	if err != nil {
+		panic(err.Error())
+	}
+	defer db.Close()
+	stmtDel, err := db.Prepare("DELETE FROM page WHERE title = ?")
+	if err != nil {
+		panic(err.Error()) // proper error handling instead of panic in your app
+	}
+	defer stmtDel.Close()
+
+	fmt.Println("DELETE")
+	var ret int
+	// err = stmtDel.QueryRow(p.Title).Scan(&ret)
+	defer stmtDel.Close()
+	fmt.Println("DELETE")
+	err = stmtDel.QueryRow(p.Title).Scan(&ret)
+	if err != nil {
+		// TODO sql: no rows in result set goroutine, even there is row.
+		// need to check the cause
+		//panic(err.Error()) // proper error handling instead of panic in your app
+	}
+	return;
+}
+
 func loadPage(title string) (*Page, error) {
 	db, err := sql.Open("mysql", "root:admin@/gowiki")
 	//fmt.Printf(" type %T", db)
@@ -124,18 +150,9 @@ func loadAllPages() ([]Page, error) {
 	}
 	defer db.Close()
 
-	// stmtOut, err := db.Prepare()
-	// if err != nil {
-	// 	panic(err.Error()) // proper error handling instead of panic in your app
-	// }
-//	defer stmtOut.Close()
-
-	//var titles []string
 	fmt.Println("SELECT")
 	rows, err := db.Query("SELECT title FROM page")
-	// fmt.Println(rows)
-	// rows.Scan(&titles)
-	// fmt.Println(titles)
+
 	if err != nil {
 		//panic(err.Error()) // proper error handling instead of panic in your app
 	}
@@ -158,6 +175,8 @@ func main() {
 	http.HandleFunc("/view/", makeHandler(viewHandler))
 	http.HandleFunc("/edit/", makeHandler(editHandler))
 	http.HandleFunc("/save/", makeHandler(saveHandler))
+	http.HandleFunc("/create/", createHandler)
+	http.HandleFunc("/delete/", makeHandler(deleteHandler))
 
 	http.ListenAndServe(":8888", nil)
 }
@@ -196,6 +215,19 @@ func saveHandler(w http.ResponseWriter, r *http.Request, title string) {
 	p := &Page{Title: title, Body: []byte(body)}
 	p.save()
 	http.Redirect(w, r, "/view/"+title, http.StatusFound)
+}
+
+func createHandler(w http.ResponseWriter, r *http.Request) {
+	title := r.FormValue("title")
+	p := &Page{Title: title, Body: []byte("")}
+	p.save()
+	http.Redirect(w, r, "/index/", http.StatusFound)
+}
+
+func deleteHandler(w http.ResponseWriter, r *http.Request, title string) {
+	p := &Page{Title: title}
+	p.delete()
+	http.Redirect(w, r, "/index/", http.StatusFound)
 }
 
 func indexHandler(w http.ResponseWriter, r *http.Request) {
