@@ -171,6 +171,7 @@ func loadAllPages() ([]Page, error) {
 }
 
 func main() {
+	http.HandleFunc("/", indexHandler)
 	http.HandleFunc("/index/", indexHandler)
 	http.HandleFunc("/view/", makeHandler(viewHandler))
 	http.HandleFunc("/edit/", makeHandler(editHandler))
