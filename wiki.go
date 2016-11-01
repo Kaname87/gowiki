@@ -16,7 +16,8 @@ type Page struct {
 	Body  []byte
 }
 
-var templates = template.Must(template.ParseFiles("edit.html", "view.html"))
+
+var templates = template.Must(template.ParseFiles("edit.html", "view.html", "index.html"))
 var validPath = regexp.MustCompile("^/(edit|save|view)/([a-zA-Z0-9]+)$")
 
 func getTitle(w http.ResponseWriter, r *http.Request) (string, error) {
@@ -114,7 +115,46 @@ func loadPage(title string) (*Page, error) {
 	}
 }
 
+func loadAllPages() ([]Page, error) {
+	pages := []Page{}
+	db, err := sql.Open("mysql", "root:admin@/gowiki")
+	//fmt.Printf(" type %T", db)
+	if err != nil {
+		panic(err.Error()) // Just for example purpose. You should use proper error handling instead of panic
+	}
+	defer db.Close()
+
+	// stmtOut, err := db.Prepare()
+	// if err != nil {
+	// 	panic(err.Error()) // proper error handling instead of panic in your app
+	// }
+//	defer stmtOut.Close()
+
+	//var titles []string
+	fmt.Println("SELECT")
+	rows, err := db.Query("SELECT title FROM page")
+	// fmt.Println(rows)
+	// rows.Scan(&titles)
+	// fmt.Println(titles)
+	if err != nil {
+		//panic(err.Error()) // proper error handling instead of panic in your app
+	}
+	if rows != nil {
+		for rows.Next() {
+			var title string
+			err = rows.Scan(&title)
+			fmt.Println(title)
+			pages = append(pages, Page{Title: title})
+		}
+		return pages, nil
+	} else {
+		fmt.Println("No res savedBody")
+		return nil, err
+	}
+}
+
 func main() {
+	http.HandleFunc("/index/", indexHandler)
 	http.HandleFunc("/view/", makeHandler(viewHandler))
 	http.HandleFunc("/edit/", makeHandler(editHandler))
 	http.HandleFunc("/save/", makeHandler(saveHandler))
@@ -134,13 +174,13 @@ func makeHandler(fn func(http.ResponseWriter, *http.Request, string)) http.Handl
 }
 
 func editHandler(w http.ResponseWriter, r *http.Request, title string) {
-
 	p, err := loadPage(title)
 	if err != nil {
 		p = &Page{Title: title}
 	}
 	renderTemplate(w, "edit", p)
 }
+
 func viewHandler(w http.ResponseWriter, r *http.Request, title string) {
 	p, err := loadPage(title)
 	if err != nil {
@@ -156,6 +196,17 @@ func saveHandler(w http.ResponseWriter, r *http.Request, title string) {
 	p := &Page{Title: title, Body: []byte(body)}
 	p.save()
 	http.Redirect(w, r, "/view/"+title, http.StatusFound)
+}
+
+func indexHandler(w http.ResponseWriter, r *http.Request) {
+	ps, err := loadAllPages()
+	if err != nil {
+		// ?
+	}
+	err = templates.ExecuteTemplate(w, "index.html", ps)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
 }
 
 func renderTemplate(w http.ResponseWriter, tmpl string, p *Page) {
