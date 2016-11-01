@@ -3,7 +3,6 @@ package main
 import (
 	"errors"
 	"html/template"
-	"io/ioutil"
 	"net/http"
 	"regexp"
 
@@ -15,11 +14,6 @@ import (
 type Page struct {
 	Title string
 	Body  []byte
-}
-
-func (p *Page) save() {
-	dbSave(p)
-	return
 }
 
 var templates = template.Must(template.ParseFiles("edit.html", "view.html"))
@@ -34,7 +28,7 @@ func getTitle(w http.ResponseWriter, r *http.Request) (string, error) {
 	return m[2], nil // The title is the second subexpression.
 }
 
-func dbSave(p *Page) {
+func (p *Page) save() {
 	db, err := sql.Open("mysql", "root:admin@/gowiki")
 	if err != nil {
 		panic(err.Error()) // Just for example purpose. You should use proper error handling instead of panic
@@ -86,11 +80,12 @@ func dbSave(p *Page) {
 	if err != nil {
 		panic(err.Error())
 	}
+	return;
 }
 
-func dbSelect(title string) (*Page, error) {
+func loadPage(title string) (*Page, error) {
 	db, err := sql.Open("mysql", "root:admin@/gowiki")
-	fmt.Printf(" type %T", db)
+	//fmt.Printf(" type %T", db)
 	if err != nil {
 		panic(err.Error()) // Just for example purpose. You should use proper error handling instead of panic
 	}
@@ -105,7 +100,7 @@ func dbSelect(title string) (*Page, error) {
 	var savedBody []byte
 	fmt.Println("SELECT")
 	err = stmtOut.QueryRow(title).Scan(&savedBody) // WHERE number = 13
-	fmt.Println(savedBody)
+	//fmt.Println(savedBody)
 	if err != nil {
 		//f
 		//panic(err.Error()) // proper error handling instead of panic in your app
@@ -127,15 +122,6 @@ func main() {
 	http.ListenAndServe(":8888", nil)
 }
 
-func loadPage(title string) (*Page, error) {
-	filename := title + ".txt"
-	body, err := ioutil.ReadFile(filename)
-	if err != nil {
-		return nil, err
-	}
-	return &Page{Title: title, Body: body}, nil
-}
-
 func makeHandler(fn func(http.ResponseWriter, *http.Request, string)) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		m := validPath.FindStringSubmatch(r.URL.Path)
@@ -148,16 +134,15 @@ func makeHandler(fn func(http.ResponseWriter, *http.Request, string)) http.Handl
 }
 
 func editHandler(w http.ResponseWriter, r *http.Request, title string) {
-	//p, err := loadPage(title)
-	p, err := dbSelect(title)
+
+	p, err := loadPage(title)
 	if err != nil {
 		p = &Page{Title: title}
 	}
 	renderTemplate(w, "edit", p)
 }
 func viewHandler(w http.ResponseWriter, r *http.Request, title string) {
-	//p, err := loadPage(title)
-	p, err := dbSelect(title)
+	p, err := loadPage(title)
 	if err != nil {
 		http.Redirect(w, r, "/edit/"+title, http.StatusFound)
 		return
